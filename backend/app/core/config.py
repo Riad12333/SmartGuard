@@ -50,6 +50,9 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     mqtt_broker_host: str = "localhost"
     mqtt_broker_port: int = 1883
+    mqtt_username: str = ""
+    mqtt_password: str = ""
+    mqtt_use_tls: bool = False
 
     secret_key: str = "change-me-to-a-long-random-secret-key-in-production"
     jwt_algorithm: str = "HS256"

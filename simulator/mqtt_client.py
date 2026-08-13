@@ -29,6 +29,7 @@ class MQTTPublisher:
         device_id: str,
         username: str = "",
         password: str = "",
+        use_tls: bool = False,
         on_command: Callable[[dict], None] | None = None,
     ) -> None:
         self.host = host
@@ -42,6 +43,8 @@ class MQTTPublisher:
         )
         if username:
             self._client.username_pw_set(username, password or None)
+        if use_tls or port == 8883:
+            self._client.tls_set()
         self._client.on_connect = self._handle_connect
         self._client.on_disconnect = self._handle_disconnect
         self._client.on_message = self._handle_message

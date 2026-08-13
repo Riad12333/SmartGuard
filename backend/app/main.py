@@ -56,6 +56,8 @@ async def health_check() -> dict:
         "version": settings.app_version,
         "phase": "6",
         "mqtt_broker": f"{settings.mqtt_broker_host}:{settings.mqtt_broker_port}",
+        "mqtt_tls": settings.mqtt_use_tls or settings.mqtt_broker_port == 8883,
+        "mqtt_auth": bool(settings.mqtt_username),
     }
 
 

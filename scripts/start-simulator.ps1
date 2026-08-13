@@ -22,8 +22,21 @@ if ($DryRun) {
     $args_list += "--dry-run"
     Write-Host "Mode dry-run (sans Mosquitto)" -ForegroundColor Yellow
 } else {
-    Write-Host "Broker MQTT: localhost:1883" -ForegroundColor Gray
-    Write-Host "Assurez-vous que Mosquitto est demarre." -ForegroundColor Yellow
+    $envPath = Join-Path $ProjectRoot ".env"
+    $brokerHost = "localhost"
+    $brokerPort = "1883"
+    if (Test-Path $envPath) {
+        Get-Content $envPath | ForEach-Object {
+            if ($_ -match '^\s*MQTT_BROKER_HOST=(.+)$') { $brokerHost = $matches[1].Trim() }
+            if ($_ -match '^\s*MQTT_BROKER_PORT=(.+)$') { $brokerPort = $matches[1].Trim() }
+        }
+    }
+    Write-Host "Broker MQTT: ${brokerHost}:${brokerPort}" -ForegroundColor Gray
+    if ($brokerHost -eq "localhost") {
+        Write-Host "Assurez-vous que Mosquitto est demarre (ou configurez un broker cloud dans .env)." -ForegroundColor Yellow
+    } else {
+        Write-Host "Broker cloud — Mosquitto local non requis." -ForegroundColor Green
+    }
 }
 
 Write-Host "Scenario: $Scenario" -ForegroundColor Green

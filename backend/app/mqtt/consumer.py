@@ -10,6 +10,7 @@ import aiomqtt
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
+from app.mqtt.common import mqtt_client_kwargs
 from app.services.telemetry_service import telemetry_service
 
 logger = logging.getLogger(__name__)
@@ -44,16 +45,14 @@ class MQTTConsumer:
     async def _run_loop(self) -> None:
         while self._running:
             try:
-                async with aiomqtt.Client(
-                    hostname=settings.mqtt_broker_host,
-                    port=settings.mqtt_broker_port,
-                ) as client:
+                async with aiomqtt.Client(**mqtt_client_kwargs()) as client:
                     await client.subscribe(TELEMETRY_TOPIC)
                     await client.subscribe(EVENTS_TOPIC)
                     logger.info(
-                        "Connecte au broker MQTT %s:%s",
+                        "Connecte au broker MQTT %s:%s (tls=%s)",
                         settings.mqtt_broker_host,
                         settings.mqtt_broker_port,
+                        settings.mqtt_use_tls,
                     )
                     async for message in client.messages:
                         await self._handle_message(message)

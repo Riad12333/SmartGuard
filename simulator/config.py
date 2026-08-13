@@ -19,6 +19,7 @@ class SimulatorSettings(BaseSettings):
     mqtt_broker_port: int = 1883
     mqtt_username: str = ""
     mqtt_password: str = ""
+    mqtt_use_tls: bool = False
 
     simulator_device_id: str = "SG-DEVICE-001"
     simulator_imei: str = "SIMULATED-001"

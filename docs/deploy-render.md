@@ -137,25 +137,87 @@ Pour éviter le cold start en production : plan **Starter** (~7 $/mois).
 
 ---
 
-## MQTT (télémétrie / simulateur)
+## MQTT (télémétrie / simulateur) — Option B
 
-L’API démarre **sans** MQTT. Auth, véhicules, alertes statiques fonctionnent.
+L’API et le simulateur doivent utiliser **le même broker MQTT cloud**. `localhost` ne fonctionne pas avec Render.
 
-Pour la position live et le simulateur :
+### 1. Créer un broker HiveMQ Cloud (gratuit)
 
-1. Créez un broker cloud gratuit ([HiveMQ Cloud](https://www.hivemq.com/mqtt-cloud-broker/), [CloudMQTT](https://www.cloudmqtt.com/), etc.)
-2. Dans Render → **Environment** du Web Service :
-   ```
-   MQTT_BROKER_HOST=votre-broker.hivemq.cloud
-   MQTT_BROKER_PORT=8883
-   ```
-3. Lancez le simulateur **depuis votre PC** en pointant vers ce broker :
+1. Allez sur [HiveMQ Cloud](https://www.hivemq.com/mqtt-cloud-broker/) → **Get started free**
+2. Créez un cluster (région **EU** recommandée)
+3. Notez dans le dashboard :
+   - **Broker URL** → ex. `abc123.s1.eu.hivemq.cloud`
+   - **Port** → `8883` (TLS)
+   - **Username** et **Password** (générés à la création)
+
+### 2. Configurer Render
+
+**Render Dashboard** → `smartguard-api` → **Environment** → ajoutez :
+
+| Variable | Valeur |
+|----------|--------|
+| `MQTT_BROKER_HOST` | `abc123.s1.eu.hivemq.cloud` |
+| `MQTT_BROKER_PORT` | `8883` |
+| `MQTT_USERNAME` | *(utilisateur HiveMQ)* |
+| `MQTT_PASSWORD` | *(mot de passe HiveMQ)* |
+| `MQTT_USE_TLS` | `true` |
+
+Puis **Save** → **Manual Deploy** (ou attendez l’auto-deploy).
+
+Vérifiez :
+```powershell
+curl.exe -s https://smartguard-api.onrender.com/health
+```
+Attendu : `"mqtt_broker": "abc123....:8883"`, `"mqtt_tls": true`, `"mqtt_auth": true`
+
+### 3. Configurer votre PC (simulateur)
+
+Éditez le fichier `.env` **à la racine** du projet (copiez depuis `.env.example` si besoin) :
+
+```env
+MQTT_BROKER_HOST=abc123.s1.eu.hivemq.cloud
+MQTT_BROKER_PORT=8883
+MQTT_USERNAME=votre-utilisateur-hivemq
+MQTT_PASSWORD=votre-mot-de-passe-hivemq
+MQTT_USE_TLS=true
+```
+
+> Mosquitto local n’est **plus nécessaire** avec un broker cloud.
+
+### 4. Véhicule + simulateur
+
+1. Dans l’app mobile (connectée à Render), le véhicule doit avoir :
+   - **Device ID** : `SG-DEVICE-001` (valeur par défaut du simulateur)
+2. Lancez le simulateur :
    ```powershell
-   # Dans .env local
-   MQTT_BROKER_HOST=votre-broker.hivemq.cloud
-   MQTT_BROKER_PORT=8883
-   .\scripts\start-simulator.ps1
+   .\scripts\start-simulator.ps1 -Scenario normal
    ```
+3. Attendez ~10 s → l’app affiche **En ligne**, vitesse, volts, moteur ON
+
+### Schéma
+
+```
+Simulateur (PC) ──MQTT TLS──► HiveMQ Cloud ◄──MQTT TLS── API Render
+                                      │
+                              App mobile (HTTPS/WSS)
+```
+
+### Dépannage MQTT
+
+| Symptôme | Cause probable |
+|----------|----------------|
+| Véhicule « Hors ligne » | `device_id` différent de `SG-DEVICE-001` |
+| Simulateur OK, app offline | Variables MQTT pas identiques Render ↔ `.env` local |
+| Erreur connexion simulateur | Mauvais user/password ou TLS désactivé |
+| Données après redeploy Render | Normal si MQTT mal configuré — revérifiez `/health` |
+
+---
+
+## MQTT (ancienne section — résumé)
+
+L’API démarre **sans** MQTT configuré. Auth et CRUD véhicules fonctionnent quand même.
+
+Pour la position live, configurez un broker externe comme ci-dessus (HiveMQ Cloud recommandé).
 
 ---
 
@@ -198,6 +260,7 @@ Puis redeploy.
 | Fichier | Rôle |
 |---------|------|
 | `render.yaml` | Blueprint Render (API + Postgres) |
+| `backend/app/mqtt/common.py` | Options MQTT partagées (TLS + auth) |
 | `backend/scripts/render-start.sh` | Migrations + uvicorn production |
 | `backend/.python-version` | Python 3.12.7 |
 | `backend/app/core/config.py` | Normalisation `DATABASE_URL` Render |

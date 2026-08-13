@@ -41,6 +41,7 @@ def create_publisher(*, device_id: str, dry_run: bool, on_command=None):
         device_id=device_id,
         username=settings.mqtt_username,
         password=settings.mqtt_password,
+        use_tls=settings.mqtt_use_tls,
         on_command=on_command,
     )
 
@@ -117,6 +118,7 @@ def run_simulator(
             device_id=resolved_device_id,
             username=settings.mqtt_username,
             password=settings.mqtt_password,
+            use_tls=settings.mqtt_use_tls,
         )
         publisher._on_command = _make_command_handler(publisher, resolved_device_id, cmd_state)
 

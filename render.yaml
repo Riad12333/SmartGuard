@@ -38,9 +38,15 @@ services:
       - key: CORS_ORIGINS
         value: "*"
       - key: MQTT_BROKER_HOST
-        value: localhost
+        sync: false
       - key: MQTT_BROKER_PORT
-        value: "1883"
+        value: "8883"
+      - key: MQTT_USERNAME
+        sync: false
+      - key: MQTT_PASSWORD
+        sync: false
+      - key: MQTT_USE_TLS
+        value: "true"
     # Disque persistant (photos profil) — décommentez sur plan Starter+ :
     # disk:
     #   name: smartguard-uploads
