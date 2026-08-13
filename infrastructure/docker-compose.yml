@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartguard-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-smartguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-smartguard_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-smartguard}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-smartguard} -d ${POSTGRES_DB:-smartguard}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartguard-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: smartguard-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartguard-net
+
+  mosquitto:
+    image: eclipse-mosquitto:2
+    container_name: smartguard-mosquitto
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_log:/mosquitto/log
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -t '$$SYS/broker/uptime' -C 1 -W 3 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartguard-net
+
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: smartguard-backend
+    restart: unless-stopped
+    env_file:
+      - ../.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-smartguard}:${POSTGRES_PASSWORD:-smartguard_dev_password}@postgres:5432/${POSTGRES_DB:-smartguard}
+      REDIS_URL: redis://redis:6379/0
+      MQTT_BROKER_HOST: mosquitto
+      MQTT_BROKER_PORT: 1883
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mosquitto:
+        condition: service_healthy
+    networks:
+      - smartguard-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_log:
+
+networks:
+  smartguard-net:
+    driver: bridge

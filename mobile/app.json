@@ -1,0 +1,51 @@
+{
+  "expo": {
+    "name": "SmartGuard",
+    "slug": "smartguard",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "smartguard",
+    "userInterfaceStyle": "dark",
+    "newArchEnabled": true,
+    "icon": "./assets/logo.png",
+    "splash": {
+      "image": "./assets/logo.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#000000"
+    },
+    "androidStatusBar": {
+      "backgroundColor": "#060b14",
+      "barStyle": "light-content"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.smartguard.app"
+    },
+    "android": {
+      "usesCleartextTraffic": true,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
+        "backgroundColor": "#000000"
+      },
+      "package": "com.smartguard.app"
+    },
+    "web": {
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "SmartGuard accède à vos photos pour définir votre photo de profil.",
+          "cameraPermission": "SmartGuard utilise la caméra pour prendre votre photo de profil."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

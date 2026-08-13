@@ -1,0 +1,12 @@
+# SmartGuard MQTT ACL — Phase 1+
+# Uncomment and configure when device authentication is enabled.
+#
+# pattern read  vehicles/+/telemetry
+# pattern write vehicles/+/telemetry
+# pattern read  vehicles/+/events
+# pattern write vehicles/+/events
+# pattern read  vehicles/+/commands
+# pattern write vehicles/+/commands
+#
+# user backend
+# topic readwrite vehicles/#

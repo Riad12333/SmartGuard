@@ -1,0 +1,49 @@
+# SmartGuard — déploiement Render (Option C : API cloud)
+# https://render.com/docs/blueprint-spec
+#
+# Déploiement :
+#   1. Poussez le repo sur GitHub
+#   2. Render Dashboard → New → Blueprint → connectez le repo
+#   3. Ou : New Web Service + PostgreSQL manuellement (voir docs/deploy-render.md)
+
+databases:
+  - name: smartguard-db
+    databaseName: smartguard
+    user: smartguard
+    plan: free
+    region: frankfurt
+
+services:
+  - type: web
+    name: smartguard-api
+    runtime: python
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: bash scripts/render-start.sh
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: smartguard-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: MQTT_BROKER_HOST
+        value: localhost
+      - key: MQTT_BROKER_PORT
+        value: "1883"
+    # Disque persistant (photos profil) — décommentez sur plan Starter+ :
+    # disk:
+    #   name: smartguard-uploads
+    #   mountPath: /var/data/uploads
+    #   sizeGB: 1
+    # Et ajoutez : UPLOADS_DIR=/var/data/uploads
