@@ -191,16 +191,27 @@ class TelemetryService:
         now_ts = datetime.now(UTC).timestamp()
         threshold = now_ts - settings.tracker_online_threshold_seconds
 
+        recent_timestamps: list[float] = []
         if vehicle.tracker and vehicle.tracker.last_seen:
             last_seen = vehicle.tracker.last_seen
             if last_seen.tzinfo is None:
                 last_seen = last_seen.replace(tzinfo=UTC)
-            is_online = last_seen.timestamp() >= threshold
-        elif position and position.timestamp:
+            recent_timestamps.append(last_seen.timestamp())
+
+        if position and position.timestamp:
             pos_ts = position.timestamp
             if pos_ts.tzinfo is None:
                 pos_ts = pos_ts.replace(tzinfo=UTC)
-            is_online = pos_ts.timestamp() >= threshold
+            recent_timestamps.append(pos_ts.timestamp())
+
+        if telemetry and telemetry.timestamp:
+            tel_ts = telemetry.timestamp
+            if tel_ts.tzinfo is None:
+                tel_ts = tel_ts.replace(tzinfo=UTC)
+            recent_timestamps.append(tel_ts.timestamp())
+
+        if recent_timestamps:
+            is_online = max(recent_timestamps) >= threshold
 
         if position is None:
             return {
