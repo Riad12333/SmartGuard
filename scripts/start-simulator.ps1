@@ -4,6 +4,7 @@ param(
     [string]$Scenario = "normal",
     [ValidateSet("1", "2")]
     [string]$Profile = "1",
+    [string]$DeviceId = "",
     [switch]$DryRun
 )
 
@@ -18,6 +19,9 @@ Set-Location $SimulatorDir
 python -m pip install -r requirements.txt -q
 
 $args_list = @("--profile", $Profile, "--scenario", $Scenario)
+if ($DeviceId) {
+    $args_list += @("--device-id", $DeviceId)
+}
 if ($DryRun) {
     $args_list += "--dry-run"
     Write-Host "Mode dry-run (sans Mosquitto)" -ForegroundColor Yellow
@@ -35,7 +39,7 @@ if ($DryRun) {
     if ($brokerHost -eq "localhost") {
         Write-Host "Assurez-vous que Mosquitto est demarre (ou configurez un broker cloud dans .env)." -ForegroundColor Yellow
     } else {
-        Write-Host "Broker cloud — Mosquitto local non requis." -ForegroundColor Green
+        Write-Host "Broker cloud - Mosquitto local non requis." -ForegroundColor Green
     }
 }
 

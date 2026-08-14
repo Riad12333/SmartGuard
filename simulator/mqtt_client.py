@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import time
+import uuid
 from threading import Event
 from typing import Callable
 
@@ -37,9 +38,13 @@ class MQTTPublisher:
         self.device_id = device_id
         self._on_command = on_command
         self._connected = Event()
+        client_suffix = uuid.uuid4().hex[:8]
         self._client = mqtt.Client(
             mqtt.CallbackAPIVersion.VERSION2,
-            client_id=f"smartguard-sim-{device_id}",
+            client_id=f"smartguard-sim-{device_id}-{client_suffix}",
+            protocol=mqtt.MQTTv311,
+            clean_session=True,
+            reconnect_on_failure=True,
         )
         if username:
             self._client.username_pw_set(username, password or None)
@@ -48,8 +53,10 @@ class MQTTPublisher:
         self._client.on_connect = self._handle_connect
         self._client.on_disconnect = self._handle_disconnect
         self._client.on_message = self._handle_message
-        self._client.reconnect_delay_set(min_delay=1, max_delay=8)
+        self._client.reconnect_delay_set(min_delay=1, max_delay=10)
 
+    def _ensure_connected(self) -> bool:
+        return self._connected.wait(timeout=5.0)
     @property
     def telemetry_topic(self) -> str:
         return f"vehicles/{self.device_id}/telemetry"
@@ -64,7 +71,7 @@ class MQTTPublisher:
 
     def connect(self, *, timeout: float = 10.0) -> None:
         logger.info("Connexion MQTT -> %s:%s (device=%s)", self.host, self.port, self.device_id)
-        self._client.connect(self.host, self.port, keepalive=60)
+        self._client.connect(self.host, self.port, keepalive=120)
         self._client.loop_start()
         if not self._connected.wait(timeout):
             raise RuntimeError(
@@ -86,11 +93,13 @@ class MQTTPublisher:
     def _publish(self, topic: str, payload: dict, *, retries: int = 5) -> None:
         message = json.dumps(payload, ensure_ascii=False)
         for attempt in range(retries):
-            if not self._connected.is_set():
-                self._connected.wait(timeout=2.0)
+            if not self._connected.is_set() and not self._ensure_connected():
+                time.sleep(0.5)
+                continue
 
             result = self._client.publish(topic, message, qos=1)
             if result.rc == mqtt.MQTT_ERR_SUCCESS:
+                result.wait_for_publish(timeout=10.0)
                 logger.debug("MQTT %s -> %s", topic, message)
                 return
 
@@ -123,11 +132,10 @@ class MQTTPublisher:
     def _handle_disconnect(self, client, userdata, disconnect_flags, reason_code, properties) -> None:
         self._connected.clear()
         if reason_code != 0:
-            logger.warning(
-                "Deconnecte du broker MQTT (code=%s). "
-                "Verifiez qu'une seule instance tourne pour %s.",
+            logger.debug(
+                "Deconnecte du broker MQTT (code=%s, flags=%s)",
                 reason_code,
-                self.device_id,
+                disconnect_flags,
             )
 
     def _handle_message(self, client, userdata, message) -> None:

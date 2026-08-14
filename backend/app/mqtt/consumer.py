@@ -23,6 +23,7 @@ class MQTTConsumer:
     def __init__(self) -> None:
         self._task: asyncio.Task | None = None
         self._running = False
+        self.connected = False
 
     async def start(self) -> None:
         if self._task is not None:
@@ -48,19 +49,23 @@ class MQTTConsumer:
                 async with aiomqtt.Client(**mqtt_client_kwargs()) as client:
                     await client.subscribe(TELEMETRY_TOPIC)
                     await client.subscribe(EVENTS_TOPIC)
+                    self.connected = True
                     logger.info(
                         "Connecte au broker MQTT %s:%s (tls=%s)",
                         settings.mqtt_broker_host,
                         settings.mqtt_broker_port,
-                        settings.mqtt_use_tls,
+                        settings.mqtt_use_tls or settings.mqtt_broker_port == 8883,
                     )
                     async for message in client.messages:
                         await self._handle_message(message)
             except asyncio.CancelledError:
                 break
             except Exception as exc:
+                self.connected = False
                 logger.error("Erreur MQTT: %s — reconnexion dans 5s", exc)
                 await asyncio.sleep(5)
+            finally:
+                self.connected = False
 
     async def _handle_message(self, message: aiomqtt.Message) -> None:
         topic = str(message.topic)

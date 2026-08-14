@@ -12,6 +12,8 @@ def mqtt_client_kwargs() -> dict:
     kwargs: dict = {
         "hostname": settings.mqtt_broker_host,
         "port": settings.mqtt_broker_port,
+        "identifier": "smartguard-api-consumer",
+        "clean_session": True,
     }
 
     if settings.mqtt_username:
