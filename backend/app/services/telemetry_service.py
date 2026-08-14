@@ -78,36 +78,43 @@ class TelemetryService:
 
         await db.flush()
 
-        alert_service = AlertService(db)
-        trip_service = TripService(db)
+        # Secondary processing (security, alerts, trips)
+        try:
+            alert_service = AlertService(db)
+            trip_service = TripService(db)
+            drafts = await security_engine.evaluate_telemetry(db, vehicle, payload)
 
-        drafts = await security_engine.evaluate_telemetry(db, vehicle, payload)
-
-        for anomaly in anomaly_detector.analyze(vehicle.id, payload):
-            drafts.append(
-                AlertDraft(
-                    alert_type=anomaly.anomaly_type,
-                    severity=anomaly.severity,
-                    title=anomaly.title,
-                    message=anomaly.message,
-                    source="ml",
-                    metadata=anomaly.metadata,
+            for anomaly in anomaly_detector.analyze(vehicle.id, payload):
+                drafts.append(
+                    AlertDraft(
+                        alert_type=anomaly.anomaly_type,
+                        severity=anomaly.severity,
+                        title=anomaly.title,
+                        message=anomaly.message,
+                        source="ml",
+                        metadata=anomaly.metadata,
+                    )
                 )
+
+            if drafts:
+                await alert_service.create_from_drafts(vehicle.id, drafts)
+
+            await trip_service.update_from_telemetry(vehicle, payload)
+        except Exception as exc:
+            logger.warning("Erreur secondaire analyse telemetry vehicle_id=%s: %s", vehicle.id, exc)
+
+        try:
+            await ws_manager.broadcast_position(
+                vehicle_id=vehicle.id,
+                latitude=payload.latitude,
+                longitude=payload.longitude,
+                speed=payload.speed,
+                heading=payload.heading,
+                timestamp=timestamp,
             )
+        except Exception as exc:
+            logger.warning("Erreur broadcast WebSocket position vehicle_id=%s: %s", vehicle.id, exc)
 
-        if drafts:
-            await alert_service.create_from_drafts(vehicle.id, drafts)
-
-        await trip_service.update_from_telemetry(vehicle, payload)
-
-        await ws_manager.broadcast_position(
-            vehicle_id=vehicle.id,
-            latitude=payload.latitude,
-            longitude=payload.longitude,
-            speed=payload.speed,
-            heading=payload.heading,
-            timestamp=timestamp,
-        )
         logger.info(
             "Telemetry enregistree vehicle_id=%s device=%s speed=%.1f",
             vehicle.id,
