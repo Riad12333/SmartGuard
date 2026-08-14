@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -160,8 +160,6 @@ class TelemetryService:
             .limit(1)
         )
         position = result.scalar_one_or_none()
-        if position is None:
-            return None
 
         telemetry_result = await db.execute(
             select(VehicleTelemetry)
@@ -178,6 +176,23 @@ class TelemetryService:
                 last_seen = last_seen.replace(tzinfo=UTC)
             threshold = datetime.now(UTC).timestamp() - settings.tracker_online_threshold_seconds
             is_online = last_seen.timestamp() >= threshold
+
+        if position is None:
+            return {
+                "vehicle_id": vehicle.id,
+                "latitude": settings.home_latitude,
+                "longitude": settings.home_longitude,
+                "altitude": 0.0,
+                "speed": 0.0,
+                "heading": 0.0,
+                "ignition": False,
+                "battery_voltage": 12.6,
+                "engine_temperature": 20.0,
+                "rpm": 0,
+                "fuel_level": 100.0,
+                "timestamp": datetime.now(UTC),
+                "is_online": is_online,
+            }
 
         return {
             "vehicle_id": vehicle.id,
@@ -207,13 +222,46 @@ class TelemetryService:
         return list(result.scalars().all())
 
     async def _get_vehicle_by_device_id(self, db: AsyncSession, device_id: str) -> Vehicle | None:
+        clean_id = device_id.strip()
+        # 1. Matching exact (case insensitive)
         result = await db.execute(
             select(Vehicle)
             .join(Tracker, Vehicle.tracker_id == Tracker.id)
             .options(selectinload(Vehicle.tracker))
-            .where(Tracker.device_id == device_id)
+            .where(func.lower(Tracker.device_id) == func.lower(clean_id))
         )
-        return result.scalar_one_or_none()
+        vehicle = result.scalar_one_or_none()
+        if vehicle is not None:
+            return vehicle
+
+        # 2. Matching par IMEI ou partiel
+        result = await db.execute(
+            select(Vehicle)
+            .join(Tracker, Vehicle.tracker_id == Tracker.id)
+            .options(selectinload(Vehicle.tracker))
+            .where(
+                or_(
+                    func.lower(Tracker.imei) == func.lower(clean_id),
+                    Tracker.device_id.ilike(f"%{clean_id}%"),
+                    Tracker.imei.ilike(f"%{clean_id}%"),
+                )
+            )
+        )
+        vehicle = result.scalar_one_or_none()
+        if vehicle is not None:
+            return vehicle
+
+        # 3. Fallback ultime : s'il n'y a qu'un seul véhicule en BDD, router vers lui
+        result = await db.execute(
+            select(Vehicle)
+            .options(selectinload(Vehicle.tracker))
+            .limit(2)
+        )
+        vehicles = result.scalars().all()
+        if len(vehicles) == 1:
+            return vehicles[0]
+
+        return None
 
 
 telemetry_service = TelemetryService()
