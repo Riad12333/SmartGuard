@@ -13,6 +13,8 @@ from sqlalchemy import delete, func, select
 
 from app.core.database import AsyncSessionLocal, engine
 from app.models.alert import Alert
+from app.models.device_command import DeviceCommand
+from app.models.driving_score import DrivingScore
 from app.models.geofence import Geofence
 from app.models.password_reset_token import PasswordResetToken
 from app.models.tracker import Tracker
