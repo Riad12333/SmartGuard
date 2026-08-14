@@ -66,6 +66,15 @@ class TelemetryService:
         if vehicle.tracker:
             vehicle.tracker.last_seen = datetime.now(UTC)
             vehicle.tracker.status = TrackerStatus.ONLINE
+        else:
+            tracker = Tracker(
+                device_id=payload.device_id,
+                status=TrackerStatus.ONLINE,
+                last_seen=datetime.now(UTC),
+            )
+            db.add(tracker)
+            await db.flush()
+            vehicle.tracker_id = tracker.id
 
         await db.flush()
 
@@ -125,6 +134,15 @@ class TelemetryService:
         if vehicle.tracker:
             vehicle.tracker.last_seen = datetime.now(UTC)
             vehicle.tracker.status = TrackerStatus.ONLINE
+        else:
+            tracker = Tracker(
+                device_id=payload.device_id,
+                status=TrackerStatus.ONLINE,
+                last_seen=datetime.now(UTC),
+            )
+            db.add(tracker)
+            await db.flush()
+            vehicle.tracker_id = tracker.id
 
         if payload.event_type == "COMMAND_ACK" and payload.metadata:
             command_id = payload.metadata.get("command_id")
@@ -170,12 +188,19 @@ class TelemetryService:
         telemetry = telemetry_result.scalar_one_or_none()
 
         is_online = False
+        now_ts = datetime.now(UTC).timestamp()
+        threshold = now_ts - settings.tracker_online_threshold_seconds
+
         if vehicle.tracker and vehicle.tracker.last_seen:
             last_seen = vehicle.tracker.last_seen
             if last_seen.tzinfo is None:
                 last_seen = last_seen.replace(tzinfo=UTC)
-            threshold = datetime.now(UTC).timestamp() - settings.tracker_online_threshold_seconds
             is_online = last_seen.timestamp() >= threshold
+        elif position and position.timestamp:
+            pos_ts = position.timestamp
+            if pos_ts.tzinfo is None:
+                pos_ts = pos_ts.replace(tzinfo=UTC)
+            is_online = pos_ts.timestamp() >= threshold
 
         if position is None:
             return {
